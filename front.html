@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for Inter font and general body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .chat-container {
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 700px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 600px; /* Minimum height for the chat window */
+        }
+        .chat-header {
+            background-color: #6366f1; /* Indigo 500 */
+            color: white;
+            padding: 1rem 1.5rem;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background-color: #e0e7ff; /* Indigo 100 */
+        }
+        .message {
+            max-width: 75%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        .message.sent {
+            align-self: flex-end;
+            background-color: #818cf8; /* Indigo 400 */
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+        .message.received {
+            align-self: flex-start;
+            background-color: #ffffff;
+            color: #374151; /* Gray 700 */
+            border-bottom-left-radius: 2px;
+        }
+        .message-info {
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+            color: rgba(255, 255, 255, 0.7); /* Lighter for sent messages */
+        }
+        .message.received .message-info {
+            color: #6b7280; /* Gray 500 for received messages */
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb; /* Gray 200 */
+            background-color: #f9fafb; /* Gray 50 */
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+        }
+        .chat-input {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db; /* Gray 300 */
+            border-radius: 25px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus {
+            border-color: #6366f1; /* Indigo 500 */
+        }
+        .send-button {
+            background-color: #6366f1; /* Indigo 500 */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            margin-left: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .send-button:hover {
+            background-color: #4f46e5; /* Indigo 600 */
+            transform: translateY(-1px);
+        }
+        .send-button:active {
+            transform: translateY(0);
+        }
+        .user-name-display {
+            font-size: 0.9rem;
+            font-weight: normal;
+            margin-left: 10px;
+        }
+        .loading-indicator {
+            text-align: center;
+            padding: 1rem;
+            color: #6b7280;
+        }
+        .user-input-area {
+            display: flex;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+        }
+        .user-input {
+            flex-grow: 1;
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            outline: none;
+            font-size: 1rem;
+            margin-right: 1rem;
+        }
+        .user-input:focus {
+            border-color: #6366f1;
+        }
+        .set-name-button {
+            background-color: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .set-name-button:hover {
+            background-color: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            Chat App
+            <span id="userNameDisplay" class="user-name-display">Enter your name</span>
+        </div>
+        <div class="user-input-area">
+            <input type="text" id="userNameInput" class="user-input" placeholder="Enter your name...">
+            <button id="setNameButton" class="set-name-button">Set Name</button>
+        </div>
+        <div id="chatMessages" class="chat-messages">
+            <!-- Messages will be appended here -->
+            <div class="loading-indicator" id="loadingIndicator">Loading messages...</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="messageInput" class="chat-input" placeholder="Type your message...">
+            <button id="sendButton" class="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:8080/api';
+        
+        // DOM Elements
+        const chatMessagesDiv = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const userNameInput = document.getElementById('userNameInput');
+        const setNameButton = document.getElementById('setNameButton');
+        
+        // State
+        let currentUserName = 'Anonymous';
+        let lastMessageTimestamp = 0;
+        
+        // Initialize the app
+        function init() {
+            loadMessages();
+            setInterval(loadMessages, 2000); // Poll for new messages every 2 seconds
+            setupEventListeners();
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            setNameButton.addEventListener('click', () => {
+                const name = userNameInput.value.trim();
+                if (name) {
+                    currentUserName = name;
+                    userNameDisplay.textContent = name;
+                    userNameInput.value = '';
+                    console.log('User name set to:', name);
+                }
+            });
+            
+            userNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    setNameButton.click();
+                }
+            });
+        }
+        
+        // Load messages from the API
+        async function loadMessages() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/messages`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const messages = await response.json();
+                
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+                
+                // Clear existing messages
+                chatMessagesDiv.innerHTML = '';
+                
+                // Display messages
+                messages.forEach(message => {
+                    displayMessage(message);
+                    // Update last timestamp
+                    const messageTime = new Date(message.timestamp).getTime();
+                    if (messageTime > lastMessageTimestamp) {
+                        lastMessageTimestamp = messageTime;
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                loadingIndicator.textContent = 'Error loading messages. Please check if the server is running.';
+            }
+        }
+        
+        // Send a message
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content) return;
+            
+            const message = {
+                senderId: currentUserName,
+                content: content
+            };
+            
+            try {
+                // Disable send button while sending
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+                
+                const response = await fetch(`${API_BASE_URL}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(message)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const savedMessage = await response.json();
+                console.log('Message sent successfully:', savedMessage);
+                
+                // Clear input
+                messageInput.value = '';
+                
+                // Reload messages to show the new one
+                await loadMessages();
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Error sending message. Please try again.');
+            } finally {
+                // Re-enable send button
+                sendButton.disabled = false;
+                sendButton.textContent = 'Send';
+            }
+        }
+        
+        // Display a message in the chat
+        function displayMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.senderId === currentUserName ? 'sent' : 'received'}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.textContent = message.content;
+            
+            const messageInfo = document.createElement('div');
+            messageInfo.className = 'message-info';
+            const timestamp = new Date(message.timestamp).toLocaleTimeString();
+            messageInfo.textContent = `${message.senderId} • ${timestamp}`;
+            
+            messageDiv.appendChild(messageContent);
+            messageDiv.appendChild(messageInfo);
+            
+            chatMessagesDiv.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        }
+        
+        // Start the app
+        init();
+    </script>
+</body>
+</html>

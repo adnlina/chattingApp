@@ -1,0 +1,4 @@
+com/example/chat/ChatApplication.class
+com/example/chat/model/Message.class
+com/example/chat/controller/ChatController.class
+com/example/chat/service/ChatService.class
