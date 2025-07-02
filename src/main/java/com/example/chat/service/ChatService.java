@@ -1,40 +1,35 @@
 package com.example.chat.service;
 
 import com.example.chat.model.Message;
+import com.example.chat.repository.ConversationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture; // For Promise-based async operations
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ChatService {
+    private final ConversationRepository conversationRepository;
 
-    // In-memory storage for messages. In a real app, this would be a database.
-    private final List<Message> messages = Collections.synchronizedList(new ArrayList<>());
+    @Autowired
+    public ChatService(ConversationRepository conversationRepository) {
+        this.conversationRepository = conversationRepository;
+    }
 
     /**
-     * Simulates saving a message asynchronously.
-     * Uses @Async to run in a separate thread, demonstrating asynchronous processing.
-     * Returns a CompletableFuture, which is Java's equivalent of a Promise.
-     *
-     * @param message The message to save.
-     * @return A CompletableFuture that will complete with the saved message.
+     * Save a message asynchronously between two users.
      */
     @Async
-    public CompletableFuture<Message> saveMessageAsync(Message message) {
-        System.out.println("Backend: Simulating asynchronous message saving...");
+    public CompletableFuture<Message> saveMessageAsync(String sender, String receiver, Message message) {
         try {
-            // Simulate a network/database delay
-            Thread.sleep(1000); // 1 second delay
-            message.setId(UUID.randomUUID().toString()); // Assign a unique ID
-            message.setTimestamp(Instant.now()); // Set server-side timestamp
-            messages.add(message);
-            System.out.println("Backend: Message saved: " + message.getId());
+            Thread.sleep(500); // Simulate delay
+            message.setId(UUID.randomUUID().toString());
+            message.setTimestamp(Instant.now());
+            conversationRepository.saveMessage(sender, receiver, message);
             return CompletableFuture.completedFuture(message);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -43,28 +38,16 @@ public class ChatService {
     }
 
     /**
-     * Retrieves all messages.
-     * This could also be made asynchronous if fetching from a slow data source.
-     *
-     * @return A list of all messages.
+     * Get all messages between two users.
      */
-    public List<Message> getAllMessages() {
-        // Return a copy to prevent external modification of the internal list
-        return new ArrayList<>(messages);
+    public List<Message> getAllMessages(String user1, String user2) {
+        return conversationRepository.getMessages(user1, user2);
     }
 
     /**
-     * Retrieves messages newer than a given timestamp.
-     * @param lastTimestamp The timestamp to filter messages by.
-     * @return A list of new messages.
+     * Get new messages between two users since a timestamp.
      */
-    public List<Message> getNewMessages(Instant lastTimestamp) {
-        List<Message> newMessages = new ArrayList<>();
-        for (Message message : messages) {
-            if (message.getTimestamp().isAfter(lastTimestamp)) {
-                newMessages.add(message);
-            }
-        }
-        return newMessages;
+    public List<Message> getNewMessages(String user1, String user2, Instant lastTimestamp) {
+        return conversationRepository.getNewMessages(user1, user2, lastTimestamp);
     }
 } 

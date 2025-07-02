@@ -163,173 +163,223 @@
     <div class="chat-container">
         <div class="chat-header">
             Chat App
-            <span id="userNameDisplay" class="user-name-display">Enter your name</span>
+            <span id="userNameDisplay" class="user-name-display"></span>
         </div>
-        <div class="user-input-area">
-            <input type="text" id="userNameInput" class="user-input" placeholder="Enter your name...">
-            <button id="setNameButton" class="set-name-button">Set Name</button>
+        <div id="authArea">
+            <input type="text" id="authUsername" class="user-input" placeholder="Username">
+            <input type="password" id="authPassword" class="user-input" placeholder="Password">
+            <button id="loginButton" class="set-name-button">Login</button>
+            <button id="signupButton" class="set-name-button">Sign Up</button>
+            <div id="authError" style="color:red;"></div>
         </div>
-        <div id="chatMessages" class="chat-messages">
-            <!-- Messages will be appended here -->
-            <div class="loading-indicator" id="loadingIndicator">Loading messages...</div>
-        </div>
-        <div class="chat-input-area">
-            <input type="text" id="messageInput" class="chat-input" placeholder="Type your message...">
-            <button id="sendButton" class="send-button">Send</button>
+        <div id="chatArea" style="display:none; flex-direction:column; height:100%;">
+            <div style="margin: 1rem 1.5rem 0 1.5rem;">
+                <label for="receiverSelect">Chat with: </label>
+                <select id="receiverSelect" class="user-input"></select>
+            </div>
+            <div id="chatMessages" class="chat-messages">
+                <div class="loading-indicator" id="loadingIndicator">Loading messages...</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="messageInput" class="chat-input" placeholder="Type your message...">
+                <button id="sendButton" class="send-button">Send</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // API Configuration
-        const API_BASE_URL = 'http://localhost:8080/api';
-        
-        // DOM Elements
-        const chatMessagesDiv = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const userNameInput = document.getElementById('userNameInput');
-        const setNameButton = document.getElementById('setNameButton');
-        
-        // State
-        let currentUserName = 'Anonymous';
-        let lastMessageTimestamp = 0;
-        
-        // Initialize the app
-        function init() {
+    const API_BASE_URL = 'http://localhost:8080/api';
+    const chatMessagesDiv = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const receiverSelect = document.getElementById('receiverSelect');
+    const authArea = document.getElementById('authArea');
+    const chatArea = document.getElementById('chatArea');
+    const authUsername = document.getElementById('authUsername');
+    const authPassword = document.getElementById('authPassword');
+    const loginButton = document.getElementById('loginButton');
+    const signupButton = document.getElementById('signupButton');
+    const authError = document.getElementById('authError');
+
+    let currentUser = null;
+    let lastMessageTimestamp = 0;
+    let allUsers = [];
+    let currentReceiver = null;
+
+    function saveUserToStorage(user) {
+        localStorage.setItem('chatUser', JSON.stringify(user));
+    }
+    function getUserFromStorage() {
+        const u = localStorage.getItem('chatUser');
+        return u ? JSON.parse(u) : null;
+    }
+    function clearUserFromStorage() {
+        localStorage.removeItem('chatUser');
+    }
+
+    function showChatUI() {
+        authArea.style.display = 'none';
+        chatArea.style.display = 'flex';
+        userNameDisplay.textContent = currentUser.username;
+    }
+    function showAuthUI() {
+        authArea.style.display = 'flex';
+        chatArea.style.display = 'none';
+        userNameDisplay.textContent = '';
+    }
+
+    async function fetchUsers() {
+        // For demo, fetch all users by polling conversations (no user list endpoint yet)
+        // We'll use the receiver list from conversations
+        // In a real app, add a /users endpoint
+        // For now, just keep the last used receivers
+        // This is a placeholder for future improvement
+    }
+
+    async function loadMessages() {
+        if (!currentUser || !currentReceiver) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/messages?user1=${encodeURIComponent(currentUser.username)}&user2=${encodeURIComponent(currentReceiver)}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const messages = await response.json();
+            loadingIndicator.style.display = 'none';
+            chatMessagesDiv.innerHTML = '';
+            messages.forEach(message => displayMessage(message));
+        } catch (error) {
+            loadingIndicator.textContent = 'Error loading messages.';
+        }
+    }
+
+    async function sendMessage() {
+        const content = messageInput.value.trim();
+        if (!content || !currentUser || !currentReceiver) return;
+        const message = {
+            senderId: currentUser.username,
+            receiverId: currentReceiver,
+            content: content
+        };
+        try {
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending...';
+            const response = await fetch(`${API_BASE_URL}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(message)
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            messageInput.value = '';
+            await loadMessages();
+        } catch (error) {
+            alert('Error sending message.');
+        } finally {
+            sendButton.disabled = false;
+            sendButton.textContent = 'Send';
+        }
+    }
+
+    function displayMessage(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${message.senderId === currentUser.username ? 'sent' : 'received'}`;
+        const messageContent = document.createElement('div');
+        messageContent.textContent = message.content;
+        const messageInfo = document.createElement('div');
+        messageInfo.className = 'message-info';
+        const timestamp = new Date(message.timestamp).toLocaleTimeString();
+        messageInfo.textContent = `${message.senderId} → ${message.receiverId} • ${timestamp}`;
+        messageDiv.appendChild(messageContent);
+        messageDiv.appendChild(messageInfo);
+        chatMessagesDiv.appendChild(messageDiv);
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    function setupEventListeners() {
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        receiverSelect.addEventListener('change', (e) => {
+            currentReceiver = e.target.value;
             loadMessages();
-            setInterval(loadMessages, 2000); // Poll for new messages every 2 seconds
-            setupEventListeners();
-        }
-        
-        // Setup event listeners
-        function setupEventListeners() {
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-            
-            setNameButton.addEventListener('click', () => {
-                const name = userNameInput.value.trim();
-                if (name) {
-                    currentUserName = name;
-                    userNameDisplay.textContent = name;
-                    userNameInput.value = '';
-                    console.log('User name set to:', name);
-                }
-            });
-            
-            userNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    setNameButton.click();
-                }
-            });
-        }
-        
-        // Load messages from the API
-        async function loadMessages() {
+        });
+        loginButton.addEventListener('click', async () => {
+            const username = authUsername.value.trim();
+            const password = authPassword.value;
+            if (!username || !password) return;
             try {
-                const response = await fetch(`${API_BASE_URL}/messages`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const messages = await response.json();
-                
-                // Hide loading indicator
-                loadingIndicator.style.display = 'none';
-                
-                // Clear existing messages
-                chatMessagesDiv.innerHTML = '';
-                
-                // Display messages
-                messages.forEach(message => {
-                    displayMessage(message);
-                    // Update last timestamp
-                    const messageTime = new Date(message.timestamp).getTime();
-                    if (messageTime > lastMessageTimestamp) {
-                        lastMessageTimestamp = messageTime;
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Error loading messages:', error);
-                loadingIndicator.textContent = 'Error loading messages. Please check if the server is running.';
-            }
-        }
-        
-        // Send a message
-        async function sendMessage() {
-            const content = messageInput.value.trim();
-            if (!content) return;
-            
-            const message = {
-                senderId: currentUserName,
-                content: content
-            };
-            
-            try {
-                // Disable send button while sending
-                sendButton.disabled = true;
-                sendButton.textContent = 'Sending...';
-                
-                const response = await fetch(`${API_BASE_URL}/messages`, {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(message)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const savedMessage = await response.json();
-                console.log('Message sent successfully:', savedMessage);
-                
-                // Clear input
-                messageInput.value = '';
-                
-                // Reload messages to show the new one
-                await loadMessages();
-                
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Error sending message. Please try again.');
-            } finally {
-                // Re-enable send button
-                sendButton.disabled = false;
-                sendButton.textContent = 'Send';
+                if (!response.ok) throw new Error('Login failed');
+                const user = await response.json();
+                currentUser = user;
+                saveUserToStorage(user);
+                showChatUI();
+                await updateReceiverList();
+            } catch (e) {
+                authError.textContent = 'Login failed!';
             }
+        });
+        signupButton.addEventListener('click', async () => {
+            const username = authUsername.value.trim();
+            const password = authPassword.value;
+            if (!username || !password) return;
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (!response.ok) throw new Error('Signup failed');
+                const user = await response.json();
+                currentUser = user;
+                saveUserToStorage(user);
+                showChatUI();
+                await updateReceiverList();
+            } catch (e) {
+                authError.textContent = 'Signup failed!';
+            }
+        });
+    }
+
+    async function updateReceiverList() {
+        // For demo, use a static list or previously chatted users
+        // In a real app, fetch from backend
+        // Here, just allow manual entry for now
+        receiverSelect.innerHTML = '';
+        // Optionally, add a few demo users
+        const demoUsers = ['alice', 'bob', 'charlie'];
+        demoUsers.forEach(u => {
+            if (u !== currentUser.username) {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.textContent = u;
+                receiverSelect.appendChild(opt);
+            }
+        });
+        // Set currentReceiver to first available
+        if (receiverSelect.options.length > 0) {
+            currentReceiver = receiverSelect.options[0].value;
+            loadMessages();
         }
-        
-        // Display a message in the chat
-        function displayMessage(message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${message.senderId === currentUserName ? 'sent' : 'received'}`;
-            
-            const messageContent = document.createElement('div');
-            messageContent.textContent = message.content;
-            
-            const messageInfo = document.createElement('div');
-            messageInfo.className = 'message-info';
-            const timestamp = new Date(message.timestamp).toLocaleTimeString();
-            messageInfo.textContent = `${message.senderId} • ${timestamp}`;
-            
-            messageDiv.appendChild(messageContent);
-            messageDiv.appendChild(messageInfo);
-            
-            chatMessagesDiv.appendChild(messageDiv);
-            
-            // Scroll to bottom
-            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    function init() {
+        currentUser = getUserFromStorage();
+        if (currentUser) {
+            showChatUI();
+            updateReceiverList();
+        } else {
+            showAuthUI();
         }
-        
-        // Start the app
-        init();
+        setupEventListeners();
+        setInterval(loadMessages, 2000);
+    }
+
+    init();
     </script>
 </body>
 </html>

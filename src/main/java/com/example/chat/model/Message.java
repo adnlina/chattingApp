@@ -5,6 +5,7 @@ import java.time.Instant; // Use Instant for modern timestamp handling
 public class Message {
     private String id;
     private String senderId;
+    private String receiverId;
     private String content;
     private Instant timestamp; // Using Instant for timestamp
 
@@ -12,9 +13,10 @@ public class Message {
         // Default constructor for JSON deserialization
     }
 
-    public Message(String id, String senderId, String content, Instant timestamp) {
+    public Message(String id, String senderId, String receiverId, String content, Instant timestamp) {
         this.id = id;
         this.senderId = senderId;
+        this.receiverId = receiverId;
         this.content = content;
         this.timestamp = timestamp;
     }
@@ -34,6 +36,14 @@ public class Message {
 
     public void setSenderId(String senderId) {
         this.senderId = senderId;
+    }
+
+    public String getReceiverId() {
+        return receiverId;
+    }
+
+    public void setReceiverId(String receiverId) {
+        this.receiverId = receiverId;
     }
 
     public String getContent() {
@@ -57,6 +67,7 @@ public class Message {
         return "Message{" +
                "id='" + id + '\'' +
                ", senderId='" + senderId + '\'' +
+               ", receiverId='" + receiverId + '\'' +
                ", content='" + content + '\'' +
                ", timestamp=" + timestamp +
                '}';

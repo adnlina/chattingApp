@@ -10,11 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/messages")
-@CrossOrigin(origins = "*") // Allow requests from any origin for development
+@CrossOrigin(origins = "*")
 public class ChatController {
 
     private final ChatService chatService;
@@ -25,51 +24,35 @@ public class ChatController {
     }
 
     /**
-     * Endpoint to send a new message.
-     * Demonstrates using CompletableFuture from an @Async service method.
-     *
-     * @param message The message object received from the frontend.
-     * @return ResponseEntity with the saved message or an error.
+     * Send a message from sender to receiver.
+     * senderId and receiverId must be present in the Message object.
      */
     @PostMapping
     public CompletableFuture<ResponseEntity<Message>> sendMessage(@RequestBody Message message) {
-        System.out.println("Backend: Received message to send: " + message.getContent());
-        // Call the async service method and then process its result
-        return chatService.saveMessageAsync(message)
-                .thenApply(savedMessage -> {
-                    System.out.println("Backend: Message sent response prepared.");
-                    return new ResponseEntity<>(savedMessage, HttpStatus.CREATED);
-                })
-                .exceptionally(ex -> {
-                    System.err.println("Backend: Error sending message: " + ex.getMessage());
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                });
+        if (message.getSenderId() == null || message.getReceiverId() == null) {
+            return CompletableFuture.completedFuture(new ResponseEntity<>(HttpStatus.BAD_REQUEST));
+        }
+        return chatService.saveMessageAsync(message.getSenderId(), message.getReceiverId(), message)
+                .thenApply(savedMessage -> new ResponseEntity<>(savedMessage, HttpStatus.CREATED))
+                .exceptionally(ex -> new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
     /**
-     * Endpoint to get all messages.
-     *
-     * @return A list of all messages.
+     * Get all messages between two users.
      */
     @GetMapping
-    public ResponseEntity<List<Message>> getAllMessages() {
-        System.out.println("Backend: Fetching all messages.");
-        List<Message> messages = chatService.getAllMessages();
+    public ResponseEntity<List<Message>> getAllMessages(@RequestParam String user1, @RequestParam String user2) {
+        List<Message> messages = chatService.getAllMessages(user1, user2);
         return new ResponseEntity<>(messages, HttpStatus.OK);
     }
 
     /**
-     * Endpoint to get messages newer than a specific timestamp.
-     * This can be used for simple polling.
-     *
-     * @param timestampMs The timestamp in milliseconds since epoch.
-     * @return A list of new messages.
+     * Get new messages between two users since a timestamp.
      */
     @GetMapping("/latest")
-    public ResponseEntity<List<Message>> getNewMessages(@RequestParam long timestampMs) {
-        System.out.println("Backend: Fetching new messages since: " + timestampMs);
+    public ResponseEntity<List<Message>> getNewMessages(@RequestParam String user1, @RequestParam String user2, @RequestParam long timestampMs) {
         Instant lastTimestamp = Instant.ofEpochMilli(timestampMs);
-        List<Message> newMessages = chatService.getNewMessages(lastTimestamp);
+        List<Message> newMessages = chatService.getNewMessages(user1, user2, lastTimestamp);
         return new ResponseEntity<>(newMessages, HttpStatus.OK);
     }
-} 
+}
