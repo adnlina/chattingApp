@@ -1,10 +1,18 @@
 package com.example.chat.model;
 
+import jakarta.persistence.*;
 import java.util.UUID;
 
+@Entity
+@Table(name = "users")
 public class User {
+    @Id
     private String id;
+    
+    @Column(unique = true, nullable = false)
     private String username;
+    
+    @Column(nullable = false)
     private String password;
 
     public User() {

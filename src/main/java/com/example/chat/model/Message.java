@@ -1,12 +1,24 @@
 package com.example.chat.model;
 
+import jakarta.persistence.*;
 import java.time.Instant; // Use Instant for modern timestamp handling
 
+@Entity
+@Table(name = "messages")
 public class Message {
+    @Id
     private String id;
+    
+    @Column(nullable = false)
     private String senderId;
+    
+    @Column(nullable = false)
     private String receiverId;
+    
+    @Column(nullable = false)
     private String content;
+    
+    @Column(nullable = false)
     private Instant timestamp; // Using Instant for timestamp
 
     public Message() {

@@ -1,41 +1,39 @@
 package com.example.chat.repository;
 
 import com.example.chat.model.Message;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
 
 @Repository
-public class ConversationRepository {
-    // Key: sorted user pair (user1|user2), Value: list of messages
-    private final Map<String, List<Message>> conversations = new ConcurrentHashMap<>();
-
-    private String getConversationKey(String user1, String user2) {
-        List<String> users = Arrays.asList(user1, user2);
-        Collections.sort(users);
-        return users.get(0) + "|" + users.get(1);
+public interface ConversationRepository extends JpaRepository<Message, String> {
+    
+    @Query("SELECT m FROM Message m WHERE " +
+           "(m.senderId = :user1 AND m.receiverId = :user2) OR " +
+           "(m.senderId = :user2 AND m.receiverId = :user1) " +
+           "ORDER BY m.timestamp ASC")
+    List<Message> findMessagesBetweenUsers(@Param("user1") String user1, @Param("user2") String user2);
+    
+    @Query("SELECT m FROM Message m WHERE " +
+           "((m.senderId = :user1 AND m.receiverId = :user2) OR " +
+           "(m.senderId = :user2 AND m.receiverId = :user1)) AND " +
+           "m.timestamp > :lastTimestamp " +
+           "ORDER BY m.timestamp ASC")
+    List<Message> findNewMessagesBetweenUsers(@Param("user1") String user1, @Param("user2") String user2, @Param("lastTimestamp") Instant lastTimestamp);
+    
+    default void saveMessage(String sender, String receiver, Message message) {
+        save(message);
     }
-
-    public void saveMessage(String sender, String receiver, Message message) {
-        String key = getConversationKey(sender, receiver);
-        conversations.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>())).add(message);
+    
+    default List<Message> getMessages(String user1, String user2) {
+        return findMessagesBetweenUsers(user1, user2);
     }
-
-    public List<Message> getMessages(String user1, String user2) {
-        String key = getConversationKey(user1, user2);
-        return new ArrayList<>(conversations.getOrDefault(key, Collections.emptyList()));
-    }
-
-    public List<Message> getNewMessages(String user1, String user2, Instant lastTimestamp) {
-        List<Message> all = getMessages(user1, user2);
-        List<Message> result = new ArrayList<>();
-        for (Message m : all) {
-            if (m.getTimestamp().isAfter(lastTimestamp)) {
-                result.add(m);
-            }
-        }
-        return result;
+    
+    default List<Message> getNewMessages(String user1, String user2, Instant lastTimestamp) {
+        return findNewMessagesBetweenUsers(user1, user2, lastTimestamp);
     }
 } 
